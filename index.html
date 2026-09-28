@@ -545,6 +545,7 @@
             if (el && typeof v === 'string' && document.activeElement !== el && el.value !== v) el.value = v;
         };
         setVal(`ref-${index}`, data.ref);
+        setVal(`breakfast-${index}`, data.breakfast);
         if (!NOTE_LOCAL) setVal(`note-${index}`, data.note);
         setVal(`room-${index}`, data.room);
         if (data.payment) {
@@ -647,7 +648,14 @@
                         <div class="info-row horizontal"><span class="info-label">地址</span><span class="info-value-static">${item.address}</span></div>
                         <div class="info-row horizontal"><span class="info-label">聯絡電話</span><span class="info-value-static">${item.phone}</span></div>
                         <div class="info-row horizontal"><span class="info-label">Check-in</span><span class="info-value-static">${item.checkIn}</span></div>
-                        <div class="info-row horizontal" style="border-bottom: none; padding-bottom: 0;"><span class="info-label">Check-out</span><span class="info-value-static">${item.checkOut}</span></div>
+                        <div class="info-row horizontal"><span class="info-label">Check-out</span><span class="info-value-static">${item.checkOut}</span></div>
+                        <div class="info-row horizontal"><span class="info-label">🍳 早餐</span>
+                            <select class="payment-input" id="breakfast-${index}" style="max-width: 50%; flex: 0 1 auto;" onchange="saveData(${index}, 'breakfast', this.value)">
+                                <option value="">請選擇</option>
+                                <option value="有">✅ 有</option>
+                                <option value="無">❌ 無</option>
+                            </select>
+                        </div>
                     </div>
 
                     <div class="info-card">
@@ -731,7 +739,7 @@
             document.body.classList.add('readonly-mode');
             stays.forEach((_, i) => {
                 ['ref', 'room'].forEach(k => { const el = document.getElementById(`${k}-${i}`); if (el) el.readOnly = true; });
-                ['pay-status', 'pay-date', 'pay-currency', 'pay-amount', 'pay-payer'].forEach(k => { const el = document.getElementById(`${k}-${i}`); if (el) el.disabled = true; });
+                ['pay-status', 'pay-date', 'pay-currency', 'pay-amount', 'pay-payer', 'breakfast'].forEach(k => { const el = document.getElementById(`${k}-${i}`); if (el) el.disabled = true; });
             });
         }
 
@@ -751,6 +759,7 @@
                     const data = docSnap.data();
                     if(data.ref) document.getElementById(`ref-${index}`).value = data.ref;
                     if(data.room) document.getElementById(`room-${index}`).value = data.room;
+                    if(data.breakfast) document.getElementById(`breakfast-${index}`).value = data.breakfast;
                     if(!NOTE_LOCAL && data.note) document.getElementById(`note-${index}`).value = data.note;
                     if (NOTE_LOCAL && isAdmin && data.note && loadLocalNote(index) === null) saveLocalNote(index, data.note); // 舊版雲端備註，只給管理者一次性帶入本機
                     
