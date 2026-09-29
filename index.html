@@ -550,6 +550,9 @@
         setVal(`room-${index}`, data.room);
         if (data.payment) {
             setVal(`pay-status-${index}`, data.payment.status);
+        paymentStatusCache[index] = data.payment.status;
+        paymentPayerCache[index] = data.payment.payer;
+        refreshHomeSummary();
             setVal(`pay-date-${index}`, data.payment.date);
             fillPayment(index, data.payment);
         }
@@ -603,6 +606,25 @@
         }
     }
 
+    const paymentStatusCache = {};
+    const paymentPayerCache = {};
+    function refreshHomeSummary() {
+        const el = document.getElementById('home-summary-list');
+        if (!el) return;
+        el.innerHTML = stays.map((s, i) => {
+            const paid = paymentStatusCache[i] === '已付款';
+            const payer = paymentPayerCache[i];
+            const paidNote = paid ? `（已付款${payer ? ' by ' + payer : ''}）` : '';
+            return `
+                <div class="info-row horizontal">
+                    <span class="info-label" style="min-width: 90px; color:#3B82F6; font-weight:bold;">${s.date.split(' ')[0]}</span>
+                    <span class="info-value-static" style="text-align: left; max-width: 100%; ${paid ? 'text-decoration: line-through; color: #94A3B8;' : ''}">
+                        ${s.hotel}${paid ? ` <span style="text-decoration:none; color:#059669; font-weight:600; font-size:0.85em;">${paidNote}</span>` : ''}
+                    </span>
+                </div>`;
+        }).join('');
+    }
+
     async function renderBook() {
         let html = `
             <div class="page active" id="page-0">
@@ -628,12 +650,7 @@
 
                 <div class="info-card">
                     <h3 style="margin-top:0; margin-bottom:15px; color:#1E293B; font-size:1.1em;">📅 住宿行程總表</h3>
-                    ${stays.map(s => `
-                        <div class="info-row horizontal">
-                            <span class="info-label" style="min-width: 90px; color:#3B82F6; font-weight:bold;">${s.date.split(' ')[0]}</span>
-                            <span class="info-value-static" style="text-align: left; max-width: 100%;">${s.hotel}</span>
-                        </div>
-                    `).join('')}
+                    <div id="home-summary-list"></div>
                 </div>
             </div>
         `;
@@ -734,6 +751,7 @@
         });
         
         container.innerHTML = html;
+        refreshHomeSummary();
 
         if (!isAdmin) {
             document.body.classList.add('readonly-mode');
@@ -766,6 +784,8 @@
                     if(data.payment) {
                         paymentData = data.payment;
                         if(paymentData.status) document.getElementById(`pay-status-${index}`).value = paymentData.status;
+                        paymentStatusCache[index] = paymentData.status;
+                        paymentPayerCache[index] = paymentData.payer;
                         if(paymentData.date) document.getElementById(`pay-date-${index}`).value = paymentData.date;
                         fillPayment(index, paymentData);
                     }
@@ -807,6 +827,7 @@
 
         }
 
+        refreshHomeSummary();
         updateGlobalSyncTime();
         startRealtimeSync();
 
