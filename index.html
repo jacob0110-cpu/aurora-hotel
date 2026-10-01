@@ -151,14 +151,31 @@
             padding-bottom: max(15px, env(safe-area-inset-bottom));
             border-top: 1px solid #E2E8F0; z-index: 10; gap: 10px;
         }
+        
         button.nav-btn {
             background: #1E293B; color: white; border: none;
-            padding: 12px 18px; border-radius: 25px; font-weight: 600;
-            font-size: 0.9em; cursor: pointer; flex: 1; text-align: center;
+            border-radius: 25px; font-weight: 600;
+            font-size: 0.9em; cursor: pointer; text-align: center;
         }
         button.nav-btn:disabled { background: #CBD5E1; color: #94A3B8; cursor: not-allowed; }
-        button.print-btn { background: #3B82F6; flex: 0.8; }
-        .page-indicator { font-weight: 600; color: #475569; font-size: 0.95em; white-space: nowrap; }
+        button.print-btn { background: #3B82F6; }
+        
+        /* 下拉選單樣式 */
+        .nav-select {
+            flex: 1;
+            padding: 10px 8px;
+            border-radius: 12px;
+            border: 1px solid #94A3B8;
+            background-color: #FFFFFF;
+            font-weight: 600;
+            color: #0F172A;
+            font-size: 0.95em;
+            text-align: center;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+            margin: 0 8px;
+        }
 
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
@@ -244,10 +261,13 @@
     <div class="header-title">🏨 我的住宿手冊<button id="btn-logout" onclick="doLogout()">登出</button></div>
     <div class="content-scroll" id="accom-book"></div>
     <div class="controls">
-        <button class="nav-btn" onclick="prevPage()" id="btn-prev" disabled>上一頁</button>
-        <span class="page-indicator" id="page-text">1</span>
-        <button class="nav-btn print-btn" onclick="handlePrint()">🖨️ 列印</button>
-        <button class="nav-btn" onclick="nextPage()" id="btn-next">下一頁</button>
+        <button class="nav-btn" onclick="prevPage()" id="btn-prev" disabled style="flex: 0.2; padding: 12px 10px;">◀</button>
+        
+        <!-- 下拉選單 -->
+        <select id="page-select" class="nav-select" onchange="goToPage(parseInt(this.value))"></select>
+        
+        <button class="nav-btn print-btn" onclick="handlePrint()" style="flex: 0.3; padding: 12px 10px;">🖨️ 列印</button>
+        <button class="nav-btn" onclick="nextPage()" id="btn-next" style="flex: 0.2; padding: 12px 10px;">▶</button>
     </div>
 </div>
 
@@ -271,7 +291,6 @@
     const REQUIRE_LOGIN = false;
     const NOTE_LOCAL = REQUIRE_LOGIN; // 個人補充事項是否只存本機
     const ALLOW_SIGNUP = true; // 使用者可自行註冊；註冊後須點信中連結驗證 Email，且 Email 須在 Firestore 規則的名單內才讀得到資料
-    // 手機/行動網路常擋 WebChannel 串流，自動改用 long-polling 才連得上
     const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
 
     const stays = [
@@ -290,7 +309,7 @@
     let saveTimeout;
 
     let syncError = null;
-    const MAX_DOC_CHARS = 900000; // Firestore 單一文件上限約 1MB
+    const MAX_DOC_CHARS = 900000;
 
     function updateGlobalSyncTime() {
         const timeEl = document.getElementById('global-sync-time');
@@ -313,7 +332,7 @@
     }
 
     async function writeToFirebase(index, field, value) {
-        if (!isAdmin) return; // 只有管理者能寫入雲端
+        if (!isAdmin) return;
         try {
             const docRef = doc(db, "Accommodations", `stay_${index}`);
             await setDoc(docRef, { [field]: value }, { merge: true });
@@ -328,7 +347,7 @@
 
     const saveTimers = {};
     window.saveData = function(index, field, value) {
-        if (field === 'note' && NOTE_LOCAL) { saveLocalNote(index, value); return; } // 個人補充事項：只存本機
+        if (field === 'note' && NOTE_LOCAL) { saveLocalNote(index, value); return; }
         if (!isAdmin) return;
         const key = `${index}-${field}`;
         clearTimeout(saveTimers[key]);
@@ -342,7 +361,6 @@
         { code: "GBP", name: "英鎊" }
     ];
 
-    // 相容舊資料：原本金額是文字（如 "EUR 150"），自動拆成貨幣＋金額
     function parsePayment(p) {
         let currency = p.currency || '';
         let amount = (p.amount === undefined || p.amount === null) ? '' : String(p.amount);
@@ -512,7 +530,6 @@
         }
     };
 
-    // 把舊版存在「本機 IndexedDB」的照片一次性搬到雲端
     function getDeviceId() {
         try {
             let id = localStorage.getItem('deviceId');
@@ -538,7 +555,6 @@
         }
     }
 
-    // 即時同步：任何裝置改動，其他裝置馬上更新
     function applyStayData(index, data) {
         const setVal = (id, v) => {
             const el = document.getElementById(id);
@@ -550,9 +566,9 @@
         setVal(`room-${index}`, data.room);
         if (data.payment) {
             setVal(`pay-status-${index}`, data.payment.status);
-        paymentStatusCache[index] = data.payment.status;
-        paymentPayerCache[index] = data.payment.payer;
-        refreshHomeSummary();
+            paymentStatusCache[index] = data.payment.status;
+            paymentPayerCache[index] = data.payment.payer;
+            refreshHomeSummary();
             setVal(`pay-date-${index}`, data.payment.date);
             fillPayment(index, data.payment);
         }
@@ -573,7 +589,7 @@
         });
     }
 
-        function getWeatherDesc(code) {
+    function getWeatherDesc(code) {
         if (code === 0) return "☀️ 晴朗無雲";
         if (code <= 3) return "⛅ 晴時多雲";
         if (code === 45 || code === 48) return "🌫 起霧";
@@ -625,13 +641,35 @@
         }).join('');
     }
 
+    // 重新修改這段，直接使用原始資料裡的日期與地點名稱
+    function renderPageSelect() {
+        const select = document.getElementById('page-select');
+        if (!select) return;
+        
+        let options = `<option value="0">🗺️ 總覽</option>`;
+        stays.forEach((stay, index) => {
+            // 直接帶入完整的 stay.date，例如： "10/13 - 10/15 (奧斯陸)"
+            options += `<option value="${index + 1}">${stay.date}</option>`;
+        });
+        select.innerHTML = options;
+    }
+
+    window.goToPage = function(pageId) {
+        if (currentPage !== pageId) {
+            document.getElementById(`page-${currentPage}`).classList.remove('active');
+            currentPage = pageId;
+            document.getElementById(`page-${currentPage}`).classList.add('active');
+            updateButtons();
+        }
+    };
+
     async function renderBook() {
         let html = `
             <div class="page active" id="page-0">
                 <div class="info-card" id="global-sync-card" style="background: #ECFDF5; border: 1px solid #A7F3D0; display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;">
                     <div style="display: flex; align-items: center; gap: 12px;">
                         <div style="background: #10B981; color: white; width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1em;">
-                            ☁️
+                            ☁️️
                         </div>
                         <div>
                             <div style="font-weight: bold; color: #065F46; font-size: 1.05em;">雲端資料已備份</div>
@@ -706,7 +744,7 @@
                             <div style="display:flex; gap:8px; flex:1;">
                                 <select class="payment-input" id="pay-currency-${index}" style="flex:0 0 42%; text-align:left;" onchange="savePayment(${index})">
                                     <option value="">貨幣</option>
-                                    ${CURRENCIES.map(c => `<option value="${c.code}">${c.code} ${c.name}</option>`).join('')}
+                                    ${CURRENCIES.map(c => `<option value="${c.code}">${c.code}${c.name}</option>`).join('')}
                                 </select>
                                 <input type="number" inputmode="decimal" min="0" step="any" class="payment-input" id="pay-amount-${index}" oninput="savePayment(${index})" placeholder="輸入金額" style="min-width:0;">
                             </div>
@@ -770,7 +808,6 @@
         for (let index = 0; index < stays.length; index++) {
             let paymentData = { status: "", date: "", amount: "" };
 
-            // 1. 讀取 Firebase 雲端資料
             try {
                 const docSnap = await getDoc(doc(db, "Accommodations", `stay_${index}`));
                 if (docSnap.exists()) {
@@ -779,7 +816,7 @@
                     if(data.room) document.getElementById(`room-${index}`).value = data.room;
                     if(data.breakfast) document.getElementById(`breakfast-${index}`).value = data.breakfast;
                     if(!NOTE_LOCAL && data.note) document.getElementById(`note-${index}`).value = data.note;
-                    if (NOTE_LOCAL && isAdmin && data.note && loadLocalNote(index) === null) saveLocalNote(index, data.note); // 舊版雲端備註，只給管理者一次性帶入本機
+                    if (NOTE_LOCAL && isAdmin && data.note && loadLocalNote(index) === null) saveLocalNote(index, data.note);
                     
                     if(data.payment) {
                         paymentData = data.payment;
@@ -824,7 +861,6 @@
                     }
                 }
             }
-
         }
 
         refreshHomeSummary();
@@ -846,13 +882,18 @@
             `;
         }
         
+        renderPageSelect(); // 初始化下拉選單
         updateButtons();
     }
 
     function updateButtons() {
         document.getElementById('btn-prev').disabled = currentPage === 0;
         document.getElementById('btn-next').disabled = currentPage === totalPages - 1;
-        document.getElementById('page-text').innerText = `${currentPage + 1} / ${totalPages}`;
+        
+        // 同步下拉選單的選項
+        const pageSelect = document.getElementById('page-select');
+        if (pageSelect) pageSelect.value = currentPage;
+
         document.getElementById('accom-book').scrollTop = 0; 
 
         if (currentPage > 0) {
